@@ -61,6 +61,7 @@ def make_cache_key(context, model_name, system_prompt):
 
 
 def get_cached_analysis(cache_key):
+    init_db()
     conn = sqlite3.connect(DB_PATH, timeout=30)
 
     row = conn.execute(
@@ -91,6 +92,7 @@ def get_cached_analysis(cache_key):
 
 
 def save_cached_analysis(cache_key, analysis):
+    init_db()
     conn = sqlite3.connect(DB_PATH, timeout=30)
 
     conn.execute(

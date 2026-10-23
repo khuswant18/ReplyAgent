@@ -37,6 +37,7 @@ def load_replies(path: str | Path) -> pd.DataFrame: #Load and validate the CSV
 def process_replies_stream(
     input_path: str | Path,
     output_path: str = "output/analyzed_replies.csv",
+    bypass_cache: bool = False,
 ):
     """Generator that yields (processed_row, current_index, total_count) as each row finishes."""
     df = load_replies(input_path)
@@ -48,6 +49,7 @@ def process_replies_stream(
             result = reply_graph.invoke({
                 "row": {key: "" if pd.isna(value) else str(value) for key, value in row.items()} ,
                 "attempts": 0,
+                "bypass_cache": bypass_cache,
             })
             print("result===================",result)
             print()
@@ -118,11 +120,14 @@ def process_replies(
     input_path: str | Path,
     output_path: str = "output/analyzed_replies.csv",
     progress_callback=None,
+    bypass_cache: bool = False,
 ) -> tuple[pd.DataFrame, str]:
     """Run each reply through LangGraph and export the results."""
     results = []
     reset_stats() #change all stats to 0 in SQlite 
-    for processed_row, index, total in process_replies_stream(input_path, output_path):
+    for processed_row, index, total in process_replies_stream(
+        input_path, output_path, bypass_cache=bypass_cache
+    ):
         if progress_callback:
             progress_callback(index / total, desc=f"Processing reply {index}/{total}")
         else:
@@ -147,6 +152,11 @@ if __name__ == "__main__":
         "--output",
         default="output/analyzed_replies.csv",
     )
+    parser.add_argument(
+        "--bypass-cache",
+        action="store_true",
+        help="Bypass SQLite cache and run fresh classifications",
+    )
 
     args = parser.parse_args()
-    process_replies(args.input, args.output)
+    process_replies(args.input, args.output, bypass_cache=args.bypass_cache)

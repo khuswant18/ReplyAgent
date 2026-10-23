@@ -9,7 +9,7 @@ from csv_processor import process_replies
 load_dotenv()
 
 
-def run_triage(file, progress=gr.Progress(track_tqdm=True)):
+def run_triage(file, bypass_cache: bool = False, progress=gr.Progress(track_tqdm=True)):
 
     if file is None:
         raise gr.Error("upload a CSV file.")
@@ -28,6 +28,7 @@ def run_triage(file, progress=gr.Progress(track_tqdm=True)):
             input_path=file_path,
             output_path=out_csv_path,
             progress_callback=progress,
+            bypass_cache=bypass_cache,
         )
     except ValueError as ve:
         raise gr.Error(f"Validation Error: {ve}")
@@ -92,11 +93,17 @@ def create_app() -> gr.Blocks:
                     file_count="single",
                 )
             with gr.Column(scale=1):
-                process_btn = gr.Button(
-                    "Process Replies",
-                    variant="primary",
-                    size="lg",
-                )
+                with gr.Row():
+                    process_btn = gr.Button(
+                        "Process Replies",
+                        variant="primary",
+                        size="lg",
+                    )
+                    fresh_btn = gr.Button(
+                        "Run Fresh",
+                        variant="secondary",
+                        size="lg",
+                    )
                 download_file = gr.File(
                     label="Download Analyzed CSV",
                     visible=False,
@@ -147,18 +154,32 @@ def create_app() -> gr.Blocks:
             wrap=True,
         )
 
+        def run_cached(file, progress=gr.Progress(track_tqdm=True)):
+            return run_triage(file, bypass_cache=False, progress=progress)
+
+        def run_fresh(file, progress=gr.Progress(track_tqdm=True)):
+            return run_triage(file, bypass_cache=True, progress=progress)
+
+        outputs = [
+            total_metric,
+            yes_metric,
+            no_metric,
+            future_metric,
+            review_metric,
+            results_table,
+            download_file,
+        ]
+
         process_btn.click(
-            fn=run_triage,
+            fn=run_cached,
             inputs=[csv_file],
-            outputs=[
-                total_metric,
-                yes_metric,
-                no_metric,
-                future_metric,
-                review_metric,
-                results_table,
-                download_file,
-            ],
+            outputs=outputs,
+        )
+
+        fresh_btn.click(
+            fn=run_fresh,
+            inputs=[csv_file],
+            outputs=outputs,
         )
 
     return demo

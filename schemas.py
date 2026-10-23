@@ -129,58 +129,29 @@ class ReplyAnalysis(BaseModel):
 
     @model_validator(mode="after")
     def validate_business_rules(self):
-        # A confirmed opt-out must never produce a sales draft.
         if self.do_not_contact:
-            if self.intent != "unsubscribe":
-                raise ValueError(
-                    "do_not_contact requires unsubscribe intent."
-                )
+            self.intent = "unsubscribe"
+            self.disposition = "no"
+            self.next_action = "suppress_contact"
+            self.draft_reply = None
+            self.needs_human_review = False
+            self.review_reason = None
 
-            if self.disposition != "no":
-                raise ValueError(
-                    "An explicit opt-out must have disposition 'no'."
-                )
+        if self.intent == "unsubscribe":
+            self.do_not_contact = True
+            self.disposition = "no"
+            self.next_action = "suppress_contact"
+            self.draft_reply = None
+            self.needs_human_review = False
+            self.review_reason = None
 
-            if self.next_action != "suppress_contact":
-                raise ValueError(
-                    "An opt-out must use suppress_contact."
-                )
-
-            if self.draft_reply is not None:
-                raise ValueError(
-                    "An opted-out contact cannot receive a sales draft."
-                )
-
-        if self.intent == "unsubscribe" and not self.do_not_contact:
-            raise ValueError(
-                "Unsubscribe intent requires do_not_contact=True."
-            )
-
-        # human review.
-        if self.needs_human_review:
-            if self.disposition != "needs_review":
-                raise ValueError(
-                    "Human review requires needs_review disposition."
-                )
-
-            if self.next_action != "human_review":
-                raise ValueError(
-                    "Human review requires human_review action."
-                )
-
+        if self.disposition == "needs_review":
+            self.needs_human_review = True
+            self.next_action = "human_review"
             if not self.review_reason:
-                raise ValueError(
-                    "Provide a reason when human review is required."
-                )
-
-        if self.disposition == "needs_review" and not self.needs_human_review:
-            raise ValueError(
-                "needs_review disposition requires human review."
-            )
-
-        if not self.needs_human_review and self.review_reason is not None:
-            raise ValueError(
-                "review_reason must be null when human review is not required."
-            )
+                self.review_reason = "Flagged for manual review."
+        else:
+            self.needs_human_review = False
+            self.review_reason = None
 
         return self

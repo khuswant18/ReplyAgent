@@ -1,6 +1,7 @@
 import json 
 import os
 import re 
+import time
 from typing import TypedDict
 from dotenv import load_dotenv
 from groq import Groq
@@ -58,7 +59,8 @@ class Reply(TypedDict,total=False):# think of it as a shared state that carries 
     raw_output: str
     analysis: ReplyAnalysis
     error: str
-    attempts:int
+    attempts: int
+    bypass_cache: bool
 
 _client = None 
 max_attempt = 2
@@ -70,12 +72,12 @@ def get_client() -> Groq:
         if not api:
             raise ValueError("api key missing in env")
         
-        _client = Groq(api_key=api,max_retries=0)
+        _client = Groq(api_key=api, max_retries=0)
     return _client 
 
 
 
-def classify_with_groq(row: dict[str, str]) -> ReplyAnalysis:
+def classify_with_groq(row: dict[str, str], bypass_cache: bool = False) -> ReplyAnalysis:
 
     context = {
         "received_at": row.get("received_at", ""),
@@ -95,14 +97,17 @@ def classify_with_groq(row: dict[str, str]) -> ReplyAnalysis:
         system_prompt=SYSTEM_PROMPT,
     )
 
-    cached_analysis = get_cached_analysis(cache_key)
-
-    if cached_analysis is not None:
-        to_show["cache_hits"] += 1
-        return cached_analysis
+    if not bypass_cache:
+        cached_analysis = get_cached_analysis(cache_key)
+        if cached_analysis is not None:
+            to_show["cache_hits"] += 1
+            return cached_analysis
 
     to_show["cache_misses"] += 1
     to_show["api_calls"] += 1
+
+    # Delay to stay under Groq's 8,000 TPM rate limit
+    time.sleep(5)
 
     response = get_client().chat.completions.create(
         model=model_name,
@@ -132,7 +137,8 @@ def classify_with_groq(row: dict[str, str]) -> ReplyAnalysis:
         raise ValueError("Groq returned an empty response.")
 
     analysis = ReplyAnalysis.model_validate_json(content)
-    save_cached_analysis(cache_key, analysis)
+    if not bypass_cache:
+        save_cached_analysis(cache_key, analysis)
     return analysis
 
 
@@ -227,9 +233,18 @@ def classify_node(state: Reply) -> dict:
     """Classify the reply, retrying failed analyses through graph routing."""
     row = state.get("row", {})
     attempts = state.get("attempts", 0)
+    bypass_cache = state.get("bypass_cache", False)
 
     try:
-        analysis = classify_with_groq(row)
+        analysis = classify_with_groq(row, bypass_cache=bypass_cache)
+        print(
+            "BEFORE SAFETY CHECK:",
+            analysis.disposition,
+            analysis.intent,
+            "do_not_contact =", analysis.do_not_contact,
+            "needs_human_review =", analysis.needs_human_review,
+            "| REPLY =", row.get("their_reply", "")
+            )
 
         # The model might detect an opt-out that the regex did not.
         # Don't silently suppress the contact: request human verification.
@@ -272,8 +287,16 @@ def classify_node(state: Reply) -> dict:
         }
 
     except Exception as exc:
-        # Keep the error type for diagnostics without exposing API details
-        # to end users.
+        print(f"Classification attempt {attempts + 1} failed: {type(exc).__name__}: {exc}")
+        # If we hit the rate limit (8k TPM limit), wait for token bucket to replenish before retrying
+        if "RateLimit" in type(exc).__name__:
+            wait_time = 15.0
+            match = re.search(r"try again in ([\d\.]+)s", str(exc))
+            if match:
+                wait_time = max(float(match.group(1)) + 1.0, 5.0)
+            print(f"Rate limited by Groq API. Waiting {wait_time:.1f}s before retry...")
+            time.sleep(wait_time)
+
         return {
             "analysis": None,
             "error": type(exc).__name__,
