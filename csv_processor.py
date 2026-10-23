@@ -45,14 +45,9 @@ def process_replies_stream(
     total = len(df)
 
     for index, row in enumerate(df.to_dict(orient="records"), start=1): #made a dictionary of each row and we are traversing on it, start=1 because we want count from 1 not 0
-        print("\n================================================================================")
-        print(f"==================== >> [ROW {index}/{total}] STARTING PROCESSING")
-        print(f"==================== >> ID:           {row.get('id')}")
         print(f"==================== >> SENDER:       {row.get('sender_name')} ({row.get('sender_title')}) @ {row.get('company')}")
         print(f"==================== >> OUR MESSAGE:  {row.get('our_message')}")
-        print(f"==================== >> THEIR REPLY:  {row.get('their_reply')}")
-        print(f"==================== >> BYPASS CACHE: {bypass_cache}")
-        print("================================================================================\n")
+        print("================\n")
         try:
             result = reply_graph.invoke({
                 "row": {key: "" if pd.isna(value) else str(value) for key, value in row.items()} ,
