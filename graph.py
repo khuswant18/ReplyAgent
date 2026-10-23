@@ -155,14 +155,12 @@ def is_explicit_opt_out(reply: str) -> bool:
     ):
         return True
 
-    # 1. Guard against removal negation (e.g. 'don't remove me from your list')
     if re.search(
         r"\b(?:don't|dont|do\s+not|never)\s+(?:please\s+)?(?:remove|take)\s+(?:me\s+)?(?:from|off)",
         text,
     ):
         return False
 
-    # 2. Guard against temporal deferrals and channel redirects (e.g. 'stop emailing me for now')
     temporal_qualifiers = (
         r"(?:until|before|till|unless|after|for\s+now"
         r"|right\s+now|at\s+this\s+time|at\s+the\s+moment"
@@ -246,8 +244,6 @@ def classify_node(state: Reply) -> dict:
             "| REPLY =", row.get("their_reply", "")
             )
 
-        # The model might detect an opt-out that the regex did not.
-        # Don't silently suppress the contact: request human verification.
         if (
             analysis.do_not_contact
             and not is_explicit_opt_out(row.get("their_reply", ""))

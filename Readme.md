@@ -1,49 +1,97 @@
 # Sales Reply Triage Agent
 
-An AI-powered tool that analyzes sales email replies, classifies prospect intent, and recommends the next action using Groq, LangGraph, and Pydantic.
+An AI tool that classifies inbound sales email replies, extracts prospect intent, and recommends next actions using LangGraph, Groq, and Pydantic.
 
 ## Features
 
-- **Reply Classification:** Categorizes replies as `yes`, `no`, `future`, or `needs_review`.
-- **Intent Extraction:** Identifies interest, pricing questions, referrals, objections, and follow-ups.
-- **Smart Recommendations:** Suggests next actions and drafts replies when appropriate.
-- **Safety Checks:** Flags explicit opt-outs and uncertain responses for appropriate handling.
-- **SQLite Caching:** Reuses successful classifications to reduce repeated API calls.
-- **CSV Processing:** Upload, analyze, view, and download results through a Gradio interface.
+- **Reply Classification:** Classifies replies into `yes`, `no`, `future`, or `needs_review`.
+- **Intent Extraction:** Detects intents like `interested`, `pricing_question`, `request_for_examples`, `referral`, `out_of_office`, `unsubscribe`, and `wrong_contact`.
+- **Next Action & Drafts:** Recommends follow-up actions (`offer_call`, `send_examples`, `answer_pricing`, etc.) and generates suggested email drafts.
+- **Opt-Out Safety:** Regex-based rules detect explicit unsubscribe requests and suppress contact without calling the LLM.
+- **Dual Processing Modes:**
+  - **Process Replies:** Uses SQLite caching to return instant results for previously analyzed replies and save API calls.
+  - **Run Fresh:** Bypasses cache reads and writes to force fresh LLM analysis.
+- **Web UI & CLI:** Upload CSVs via a Gradio web interface or process them from the command line.
 
 ## Tech Stack
 
-Python, Gradio, LangGraph, Groq API, Pydantic, Pandas, SQLite.
+- Python 3.11+
+- LangGraph
+- Groq API
+- Pydantic v2
+- Gradio
+- Pandas
+- SQLite
 
 ## Setup
 
-Clone the repository and install dependencies:
+1. Clone the repository and install dependencies:
 
 ```bash
 git clone https://github.com/khuswant18/ReplyAgent.git
 cd ReplyAgent
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+2. Create a `.env` file:
 
 ```env
 GROQ_API_KEY=your_groq_api_key
-GROQ_MODEL=your_groq_model
+GROQ_MODEL=openai/gpt-oss-20b
+PORT=7860
 ```
 
-Start the application:
+3. Run the Gradio web interface:
 
 ```bash
 python app.py
 ```
 
-Open the local URL displayed in your terminal.
+Open `http://localhost:7860` in your browser.
+
+4. Run via CLI:
+
+```bash
+# Process with caching
+python csv_processor.py replies.csv --output output/analyzed_replies.csv
+
+# Process fresh (bypass cache)
+python csv_processor.py replies.csv --bypass-cache
+```
+
+## CSV Format
+
+The input CSV requires the following columns:
+
+| Column | Description |
+|---|---|
+| `id` | Unique row identifier |
+| `received_at` | Timestamp of the reply |
+| `sender_name` | Prospect's name |
+| `sender_title` | Prospect's job title |
+| `company` | Company name |
+| `our_message` | Outreach message sent |
+| `their_reply` | Prospect's reply text |
+
+## Testing
+
+Run tests with pytest:
+
+```bash
+pytest
+```
+
+## Future Improvements
+
+- **CRM Integration:** Sync leads and statuses directly with HubSpot or Salesforce.
+- **Sequencer Integration:** Auto-pause outreach campaigns in Smartlead or Instantly upon reply.
+- **Email Sending:** In-app one-click review and send via Gmail or Outlook.
+- **Multi-Turn Context:** Support multi-message email threads instead of single replies.
+- **Multi-Model Support:** Fallback to OpenAI or local Ollama models on rate limits.
+- **Custom Rules:** Custom intent tags and playbooks configurable from the UI.
 
 ## Safety
 
-The agent does not automatically send emails. Review flagged responses and generated drafts before taking action.
-
-## Deployment
-
-The application can be deployed as a web service on Render. Configure `GROQ_API_KEY` and `GROQ_MODEL` as environment variables in the service settings.
+The agent does not send emails automatically. All generated drafts and actions require human review before reaching out to prospects.

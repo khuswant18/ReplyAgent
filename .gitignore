@@ -1,16 +1,14 @@
-# Byte-compiled / optimized / DLL files
+
 __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions & packaging
 *.so
 build/
 dist/
 *.egg-info/
 .eggs/
 
-# Virtual environments
 .venv/
 venv/
 env/
@@ -18,14 +16,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment variables & secrets (keep .env.example tracked)
 .env
 .env.*
 !.env.example
 *.pem
 *.key
 
-# Application outputs & SQLite caches
 output/
 *.sqlite3
 *.sqlite
@@ -33,14 +29,11 @@ output/
 *.db-journal
 *.db-wal
 
-# Output & generated CSV reports (preserve sample dataset replies.csv)
 analyzed_replies*.csv
 *_analyzed.csv
 
-# Gradio flags / temporary cache
 flagged/
 
-# Testing & coverage
 .pytest_cache/
 .coverage
 htmlcov/
@@ -49,14 +42,12 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# IDE / Editor configurations
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Operating System files
 .DS_Store
 .DS_Store?
 ._*
