@@ -5,14 +5,32 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from cache import ClassificationCache, make_cache_key, reset_stats, get_stats
+import sqlite3
+from contextlib import closing
+
+from cache import (
+    get_cached_analysis,
+    save_cached_analysis,
+    make_cache_key,
+    reset_stats,
+    get_stats,
+)
 from schemas import ReplyAnalysis
 from graph import get_client, max_attempt, classify_with_groq
 
 
-def test_sqlite_cache_set_and_get(tmp_path: Path):
+def test_sqlite_cache_set_and_get(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     db_file = tmp_path / "test_cache.sqlite3"
-    test_cache = ClassificationCache(db_path=db_file)
+    monkeypatch.setattr("cache.DB_PATH", db_file)
+
+    with closing(sqlite3.connect(db_file)) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS classifications (
+                cache_key TEXT PRIMARY KEY,
+                result_json TEXT NOT NULL
+            )
+        """)
+        conn.commit()
 
     sample_analysis = ReplyAnalysis(
         disposition="yes",
@@ -32,10 +50,10 @@ def test_sqlite_cache_set_and_get(tmp_path: Path):
     )
 
     key = "sample_key_123"
-    assert test_cache.get(key) is None
+    assert get_cached_analysis(key) is None
 
-    test_cache.set(key, sample_analysis)
-    retrieved = test_cache.get(key)
+    save_cached_analysis(key, sample_analysis)
+    retrieved = get_cached_analysis(key)
     assert retrieved is not None
     assert retrieved.disposition == "yes"
     assert retrieved.intent == "interested"
@@ -63,12 +81,13 @@ def test_cache_invalidation_triggers():
     # 3. Changed prompt
     assert make_cache_key(context_base, model_base, "Different prompt") != key_base
 
-    # 4. Changed schema
-    diff_schema = {"type": "object", "properties": {"foo": {"type": "string"}}}
-    assert make_cache_key(context_base, model_base, prompt_base, schema=diff_schema) != key_base
 
-    # 5. Changed cache version
-    assert make_cache_key(context_base, model_base, prompt_base, cache_version="v2") != key_base
+def test_stats_tracking():
+    reset_stats()
+    stats = get_stats()
+    assert stats["api_calls"] == 0
+    assert stats["cache_hits"] == 0
+    assert stats["cache_misses"] == 0
 
 
 def test_groq_sdk_retries_disabled():

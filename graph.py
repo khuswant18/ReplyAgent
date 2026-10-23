@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from groq import Groq
 from schemas import ReplyAnalysis
 from langgraph.graph import END,START,StateGraph
-from cache import cache,make_cache_key,to_show
+from cache import get_cached_analysis, make_cache_key, save_cached_analysis, to_show
 
 load_dotenv()
 
@@ -53,7 +53,7 @@ RULES:
 11. Return only structured data matching the supplied schema.
 """
 
-class Reply(TypedDict,total=False):
+class Reply(TypedDict,total=False):# think of it as a shared state that carries information between nodes
     row: dict[str,str]
     raw_output: str
     analysis: ReplyAnalysis
@@ -95,7 +95,7 @@ def classify_with_groq(row: dict[str, str]) -> ReplyAnalysis:
         system_prompt=SYSTEM_PROMPT,
     )
 
-    cached_analysis = cache.get(cache_key)
+    cached_analysis = get_cached_analysis(cache_key)
 
     if cached_analysis is not None:
         to_show["cache_hits"] += 1
@@ -127,12 +127,12 @@ def classify_with_groq(row: dict[str, str]) -> ReplyAnalysis:
     )
 
     content = response.choices[0].message.content
-
+    print("content================",content)
     if not content:
         raise ValueError("Groq returned an empty response.")
 
     analysis = ReplyAnalysis.model_validate_json(content)
-    cache.set(cache_key, analysis)
+    save_cached_analysis(cache_key, analysis)
     return analysis
 
 
@@ -344,9 +344,9 @@ def build_graph():
     workflow.add_edge(START, "opt_out_check")
 
     workflow.add_conditional_edges(
-        "opt_out_check",
-        route_after_opt_out,
-        {
+        "opt_out_check",            #run let say customer is positive no opt-out so analysis is None
+        route_after_opt_out,        # this one gets analysis None and then it executes and return classify 
+        {                           #this dict map our next route as is classify -> classify else finished -> end
             "finished": END,
             "classify": "classify",
         },
@@ -365,6 +365,5 @@ def build_graph():
     workflow.add_edge("human_review", END)
 
     return workflow.compile()
-
 
 reply_graph = build_graph()

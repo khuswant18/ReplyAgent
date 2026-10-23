@@ -13,8 +13,7 @@ wanted_col = [
     "their_reply",
 ]
 
-def load_replies(path: str | Path) -> pd.DataFrame:
-    """Load and validate the input CSV."""
+def load_replies(path: str | Path) -> pd.DataFrame: #Load and validate the CSV
     try:
         df = pd.read_csv(path)
     except Exception as exc:
@@ -28,7 +27,7 @@ def load_replies(path: str | Path) -> pd.DataFrame:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
 
     if df["id"].duplicated().any():
-        raise ValueError("Duplicate IDs found in the input CSV.")
+        raise ValueError("Duplicate IDs found in the input CSV")
 
     if df["their_reply"].isna().any():
         raise ValueError("Some rows have missing customer replies.")
@@ -44,17 +43,26 @@ def process_replies_stream(
     results = []
     total = len(df)
 
-    for index, row in enumerate(df.to_dict(orient="records"), start=1):
+    for index, row in enumerate(df.to_dict(orient="records"), start=1): #made a dictionary of each row and we are traversing on it, start=1 because we want count from 1 not 0
         try:
             result = reply_graph.invoke({
-                "row": {
-                    key: "" if pd.isna(value) else str(value)
-                    for key, value in row.items()
-                },
+                "row": {key: "" if pd.isna(value) else str(value) for key, value in row.items()} ,
                 "attempts": 0,
             })
+            print("result===================",result)
+            print()
+            print()
+            print()
+            print()
 
             analysis = result.get("analysis")
+            print("analysis====================",analysis)
+            print()
+            print()
+            print()
+            print()
+            print()
+            print()
 
             if analysis is None:
                 raise ValueError("Graph returned no analysis.")
@@ -64,13 +72,27 @@ def process_replies_stream(
                 if hasattr(analysis, "model_dump")
                 else analysis
             )
+            print("analysis_data=====================",analysis_data)
+            print()
+            print()
+            print()
+            print()
+            print()
+            print()
+
 
             processed_row = {
                 **row,
                 **analysis_data,
-                "processing_status": "success",
-                "processing_error": "",
             }
+            print("processed_row==================",processed_row)
+            print()
+            print()
+            print()
+            print()
+            print()
+            print()
+            print()
 
         except Exception as exc:
             processed_row = {
@@ -84,7 +106,7 @@ def process_replies_stream(
             }
 
         results.append(processed_row)
-        yield processed_row, index, total
+        yield processed_row, index, total #wait karne ki jagah it sends these value to it's caller
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +121,7 @@ def process_replies(
 ) -> tuple[pd.DataFrame, str]:
     """Run each reply through LangGraph and export the results."""
     results = []
-    reset_stats()
+    reset_stats() #change all stats to 0 in SQlite 
     for processed_row, index, total in process_replies_stream(input_path, output_path):
         if progress_callback:
             progress_callback(index / total, desc=f"Processing reply {index}/{total}")
@@ -120,7 +142,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", nargs="?", default="replies.csv")
+    parser.add_argument("input", nargs="?", default="replies2.csv")
     parser.add_argument(
         "--output",
         default="output/analyzed_replies.csv",

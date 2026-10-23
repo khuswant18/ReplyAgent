@@ -10,14 +10,14 @@ load_dotenv()
 
 
 def run_triage(file, progress=gr.Progress(track_tqdm=True)):
-    """Process an uploaded CSV, reporting progress smoothly and displaying the final table once completed."""
+
     if file is None:
-        raise gr.Error("Please upload a CSV file before clicking Process.")
+        raise gr.Error("upload a CSV file.")
 
     file_path = file.name if hasattr(file, "name") else str(file)
 
     if not os.path.exists(file_path):
-        raise gr.Error("Uploaded file not found on server.")
+        raise gr.Error("Uploaded file not found")
 
     output_dir = Path("output")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,6 @@ def run_triage(file, progress=gr.Progress(track_tqdm=True)):
     available_cols = [c for c in display_columns if c in result_df.columns]
     table_df = result_df[available_cols].rename(columns=rename_map)
 
-    # Return the final results once after processing finishes with zero flickering
     return (
         total,
         yes_count,
@@ -82,14 +81,10 @@ def run_triage(file, progress=gr.Progress(track_tqdm=True)):
 
 def create_app() -> gr.Blocks:
     with gr.Blocks(title="Sales Reply Triage Agent") as demo:
-        gr.Markdown(
-            """
-            # Sales Reply Triage Agent
-            Upload customer outreach replies in CSV format to classify intent, identify opt-outs, and recommend next actions using LangGraph and Groq.
-            """
-        )
+        gr.Markdown("""# Sales Reply Triage Agent Upload customer outreach replies in CSV format to classify intent, 
+                    identify opt-outs, and recommend next actions using LangGraph and Groq.""")
 
-        with gr.Row():
+        with gr.Row(): #in one row we have upload and process
             with gr.Column(scale=2):
                 csv_file = gr.File(
                     label="Upload Sales Replies CSV",
@@ -170,16 +165,9 @@ def create_app() -> gr.Blocks:
 
 
 if __name__ == "__main__":
-    theme = gr.themes.Soft(
-        primary_hue="blue",
-        neutral_hue="slate",
-    )
+    theme = gr.themes.Soft(primary_hue="blue",neutral_hue="slate",)
     server_port = int(os.environ.get("PORT", "7860"))
     server_name = os.environ.get("HOST", "0.0.0.0")
 
     app = create_app()
-    app.launch(
-        theme=theme,
-        server_name=server_name,
-        server_port=server_port,
-    )
+    app.launch(theme=theme,server_name=server_name,server_port=server_port,)
