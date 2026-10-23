@@ -45,26 +45,28 @@ def process_replies_stream(
     total = len(df)
 
     for index, row in enumerate(df.to_dict(orient="records"), start=1): #made a dictionary of each row and we are traversing on it, start=1 because we want count from 1 not 0
+        print("\n================================================================================")
+        print(f"==================== >> [ROW {index}/{total}] STARTING PROCESSING")
+        print(f"==================== >> ID:           {row.get('id')}")
+        print(f"==================== >> SENDER:       {row.get('sender_name')} ({row.get('sender_title')}) @ {row.get('company')}")
+        print(f"==================== >> OUR MESSAGE:  {row.get('our_message')}")
+        print(f"==================== >> THEIR REPLY:  {row.get('their_reply')}")
+        print(f"==================== >> BYPASS CACHE: {bypass_cache}")
+        print("================================================================================\n")
         try:
             result = reply_graph.invoke({
                 "row": {key: "" if pd.isna(value) else str(value) for key, value in row.items()} ,
                 "attempts": 0,
                 "bypass_cache": bypass_cache,
             })
-            print("result===================",result)
-            print()
-            print()
-            print()
-            print()
+            print("==================== >> GRAPH RESULT ====================")
+            print(result)
+            print("=========================================================\n")
 
             analysis = result.get("analysis")
-            print("analysis====================",analysis)
-            print()
-            print()
-            print()
-            print()
-            print()
-            print()
+            print("==================== >> ANALYSIS OBJECT ====================")
+            print(analysis)
+            print("============================================================\n")
 
             if analysis is None:
                 raise ValueError("Graph returned no analysis.")
@@ -74,29 +76,20 @@ def process_replies_stream(
                 if hasattr(analysis, "model_dump")
                 else analysis
             )
-            print("analysis_data=====================",analysis_data)
-            print()
-            print()
-            print()
-            print()
-            print()
-            print()
-
+            print("==================== >> ANALYSIS DATA ====================")
+            print(analysis_data)
+            print("==========================================================\n")
 
             processed_row = {
                 **row,
                 **analysis_data,
             }
-            print("processed_row==================",processed_row)
-            print()
-            print()
-            print()
-            print()
-            print()
-            print()
-            print()
+            print("==================== >> FINAL PROCESSED ROW ====================")
+            print(processed_row)
+            print("================================================================\n")
 
         except Exception as exc:
+            print(f"==================== >> [ROW ERROR] Processing failed: {type(exc).__name__}: {exc}")
             processed_row = {
                 **row,
                 "disposition": "needs_review",
@@ -106,6 +99,9 @@ def process_replies_stream(
                 "processing_status": "failed",
                 "processing_error": type(exc).__name__,
             }
+            print("==================== >> FALLBACK PROCESSED ROW ====================")
+            print(processed_row)
+            print("===================================================================\n")
 
         results.append(processed_row)
         yield processed_row, index, total #wait karne ki jagah it sends these value to it's caller
@@ -113,7 +109,7 @@ def process_replies_stream(
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(results).to_csv(output, index=False)
-    print(f"\nFinished. Output saved to: {output.resolve()}")
+    print(f"\n==================== >> Finished. Output saved to: {output.resolve()}")
 
 
 def process_replies(
@@ -131,14 +127,16 @@ def process_replies(
         if progress_callback:
             progress_callback(index / total, desc=f"Processing reply {index}/{total}")
         else:
-            print(f"Processing reply {index}/{total}")
+            print(f"==================== >> Progress: {index}/{total}")
         results.append(processed_row)
 
     stats = get_stats()
-    print("\n--- Classification Usage ---")
-    print(f"Groq API calls: {stats['api_calls']}")
-    print(f"Cache hits:     {stats['cache_hits']}")
-    print(f"Cache misses:   {stats['cache_misses']}")
+    print("\n================================================================================")
+    print("==================== >> CLASSIFICATION USAGE SUMMARY ====================")
+    print(f"==================== >> Groq API calls: {stats['api_calls']}")
+    print(f"==================== >> Cache hits:     {stats['cache_hits']}")
+    print(f"==================== >> Cache misses:   {stats['cache_misses']}")
+    print("================================================================================\n")
 
     return pd.DataFrame(results), str(Path(output_path).resolve())
 

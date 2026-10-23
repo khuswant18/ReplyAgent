@@ -89,6 +89,7 @@ def classify_with_groq(row: dict[str, str], bypass_cache: bool = False) -> Reply
     }
 
     if is_explicit_opt_out(row.get("their_reply", "")):
+        print("==================== >> [CLASSIFY WITH GROQ] Explicit opt-out detected! Returning opt-out analysis.")
         return make_opt_out_analysis()
     
     cache_key = make_cache_key(
@@ -101,7 +102,12 @@ def classify_with_groq(row: dict[str, str], bypass_cache: bool = False) -> Reply
         cached_analysis = get_cached_analysis(cache_key)
         if cached_analysis is not None:
             to_show["cache_hits"] += 1
+            print("==================== >> [CACHE HIT] Found analysis in SQLite cache! Skipping Groq API call.")
             return cached_analysis
+        else:
+            print("==================== >> [CACHE MISS] Entry not found in SQLite cache. Calling Groq API.")
+    else:
+        print("==================== >> [BYPASS CACHE] Cache check bypassed (Fresh mode). Calling Groq API.")
 
     to_show["cache_misses"] += 1
     to_show["api_calls"] += 1
@@ -109,6 +115,7 @@ def classify_with_groq(row: dict[str, str], bypass_cache: bool = False) -> Reply
     # Delay to stay under Groq's 8,000 TPM rate limit
     time.sleep(5)
 
+    print(f"==================== >> [GROQ API CALL] Calling model {model_name}...")
     response = get_client().chat.completions.create(
         model=model_name,
         messages=[
@@ -132,13 +139,18 @@ def classify_with_groq(row: dict[str, str], bypass_cache: bool = False) -> Reply
     )
 
     content = response.choices[0].message.content
-    print("content================",content)
+    print("==================== >> [GROQ RAW RESPONSE] ====================")
+    print(content)
+    print("================================================================\n")
     if not content:
         raise ValueError("Groq returned an empty response.")
 
     analysis = ReplyAnalysis.model_validate_json(content)
     if not bypass_cache:
         save_cached_analysis(cache_key, analysis)
+        print("==================== >> [CACHE WRITE] Saved analysis to SQLite cache.")
+    else:
+        print("==================== >> [CACHE WRITE SKIPPED] Bypass cache active.")
     return analysis
 
 
@@ -220,10 +232,14 @@ def make_opt_out_analysis() -> ReplyAnalysis:
 def opt_out_check_node(state: Reply) -> dict:
     """Handle clear opt-outs without making an LLM call."""
     row = state.get("row", {})
+    reply_text = row.get("their_reply", "")
+    print(f"==================== >> [NODE: OPT-OUT CHECK] Checking reply: '{reply_text}'")
 
-    if is_explicit_opt_out(row.get("their_reply", "")):
+    if is_explicit_opt_out(reply_text):
+        print("==================== >> [OPT-OUT DETECTED] Deterministic regex match! Suppressing contact.")
         return {"analysis": make_opt_out_analysis()}
 
+    print("==================== >> [OPT-OUT CHECK PASSED] No opt-out found. Routing to classification.")
     return {"analysis": None}
 
 
@@ -232,22 +248,17 @@ def classify_node(state: Reply) -> dict:
     row = state.get("row", {})
     attempts = state.get("attempts", 0)
     bypass_cache = state.get("bypass_cache", False)
+    print(f"==================== >> [NODE: CLASSIFY] Attempt {attempts + 1}/{max_attempt} | bypass_cache={bypass_cache}")
 
     try:
         analysis = classify_with_groq(row, bypass_cache=bypass_cache)
-        print(
-            "BEFORE SAFETY CHECK:",
-            analysis.disposition,
-            analysis.intent,
-            "do_not_contact =", analysis.do_not_contact,
-            "needs_human_review =", analysis.needs_human_review,
-            "| REPLY =", row.get("their_reply", "")
-            )
+        print(f"==================== >> [ANALYSIS RESULT] Disposition: '{analysis.disposition}' | Intent: '{analysis.intent}' | DNC: {analysis.do_not_contact} | Needs Review: {analysis.needs_human_review}")
 
         if (
             analysis.do_not_contact
             and not is_explicit_opt_out(row.get("their_reply", ""))
         ):
+            print("==================== >> [SAFETY CHECK OVERRIDE] Model predicted opt-out but regex did not confirm. Overriding to needs_review.")
             data = analysis.model_dump()
             secondary = list(analysis.secondary_intents)
 
@@ -283,14 +294,14 @@ def classify_node(state: Reply) -> dict:
         }
 
     except Exception as exc:
-        print(f"Classification attempt {attempts + 1} failed: {type(exc).__name__}: {exc}")
+        print(f"==================== >> [CLASSIFY ERROR] Attempt {attempts + 1} failed: {type(exc).__name__}: {exc}")
         # If we hit the rate limit (8k TPM limit), wait for token bucket to replenish before retrying
         if "RateLimit" in type(exc).__name__:
             wait_time = 15.0
             match = re.search(r"try again in ([\d\.]+)s", str(exc))
             if match:
                 wait_time = max(float(match.group(1)) + 1.0, 5.0)
-            print(f"Rate limited by Groq API. Waiting {wait_time:.1f}s before retry...")
+            print(f"==================== >> [RATE LIMIT SLEEP] Waiting {wait_time:.1f}s before retry...")
             time.sleep(wait_time)
 
         return {
@@ -303,8 +314,10 @@ def classify_node(state: Reply) -> dict:
 def human_review_node(state: Reply) -> dict:
     """Return a reviewable result when automatic analysis fails."""
     if state.get("analysis") is not None:
+        print("==================== >> [NODE: HUMAN REVIEW] Returning existing analysis.")
         return {"analysis": state["analysis"]}
 
+    print("==================== >> [NODE: HUMAN REVIEW] Generating fallback analysis for failed reply.")
     return {
         "analysis": ReplyAnalysis(
             disposition="needs_review",
