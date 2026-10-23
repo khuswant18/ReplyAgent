@@ -83,15 +83,6 @@ Run tests with pytest:
 pytest
 ```
 
-## Future Improvements
-
-- **CRM Integration:** Sync leads and statuses directly with HubSpot or Salesforce.
-- **Sequencer Integration:** Auto-pause outreach campaigns in Smartlead or Instantly upon reply.
-- **Email Sending:** In-app one-click review and send via Gmail or Outlook.
-- **Multi-Turn Context:** Support multi-message email threads instead of single replies.
-- **Multi-Model Support:** Fallback to OpenAI or local Ollama models on rate limits.
-- **Custom Rules:** Custom intent tags and playbooks configurable from the UI.
-
 ## Safety
 
 The agent does not send emails automatically. All generated drafts and actions require human review before reaching out to prospects.
