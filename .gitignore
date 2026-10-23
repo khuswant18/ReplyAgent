@@ -1,0 +1,36 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables & secrets (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Application outputs & SQLite caches
+output/
+*.sqlite3
+*.sqlite
+*.db
+
+# macOS artifacts
+.DS_Store
+
+# IDE / Editor configurations
+.vscode/
+.idea/
+
+# Local data files
+replies.csv

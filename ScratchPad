@@ -1,0 +1,74 @@
+->handling customers -> yes , no , future 
+-want a looping mechanism 
+-should i use a classification model? Yes but not training from scratch -> constrain 100
+
+tech stack 
+--Python 
+--Pandas -> read csv
+-- LLM API understand,intent,extract dates, draft response 
+-- Langraph. -> workflow and conditional steps 
+-- Pydantic -> validate karega model output 
+-- Gradio -> web interface (https://www.google.com/search?q=Gradio&oq=Gradio&sourceid=chrome&ie=UTF-8)
+-- Deployemnt -> hugging face spaces (https://huggingface.co/docs/hub/en/spaces-overview?utm_source=chatgpt.com)
+
+
+"yes", "no", "future", "needs_review"
+interested
+pricing_question
+wrong_contact
+unsubscribe
+
+
+Upload -> Read -> validate -> condition if any -> +ve 
+-> Yes -> model se classify -> extract -> response 
+-> No -> not contact -> response
+
+validate -> human review -> export
+
+schemas.py -> model output and validation ke liye 
+graph.py -> langraph nodes, loops , routing 
+csv,app.py,rules -> one file enough 
+
+
+Langraph -> start -> opt-out -> sidha mana kardega 
+                             -> classify from groq + schema validation 
+                             End 
+
+we need a csv_processor.py for generating enriched CSV
+Instead of processing all once let user see one by one
+
+==========Impppppppppppp optimization========
+calling every call for one row -> calling every api call -> almost 174 calls 
+---Disable Groq's automatic retries =====> _client = Groq(api_key=api,max_retries=0)
+---Successful results ko cache (SQLite) 
+    -> Changed reply or model/prompt/schema: classify it again.
+    -> Failed API requests: don't cache them as successful results.
+---Logs in the terminal 
+
+
+
+AI Written 
+
+1. Workflow:
+   Upload CSV
+      -> Read and validate
+      -> Apply deterministic safety rules
+      -> Classify reply using LLM
+      -> Extract relevant details
+      -> Recommend action / draft response
+      -> Validate output and business rules
+      -> If invalid, retry once
+      -> If still uncertain, human review
+      -> Export enriched CSV
+
+2. Safety:
+   - Explicit opt-out -> Suppress contact
+   - Not interested != automatically an opt-out
+   - Conflicting intent / uncertain opt-out -> Human review
+   - Never send emails automatically
+
+3. Evaluation:
+   - Test all 40 replies
+   - Check classification and date extraction
+   - Test opt-out false positives and false negatives
+   - Record errors and improve rules

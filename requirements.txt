@@ -1,0 +1,14 @@
+# Core Agent & LLM Workflow
+langgraph>=1.2.0
+groq>=1.7.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# Data Processing
+pandas>=2.0.0
+
+# Web Interface (Hugging Face Spaces / Local)
+gradio>=6.0.0
+
+# Testing & Verification
+pytest>=8.0.0
